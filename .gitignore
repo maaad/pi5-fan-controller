@@ -1,0 +1,34 @@
+# Build directory
+build/
+cmake-build-*/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Compiled binaries
+*.o
+*.a
+*.so
+*.exe
+pi5_fan_controller
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Editor backup files
+*.bak
+*.tmp
+
+# System files
+*.log
+

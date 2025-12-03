@@ -1,0 +1,46 @@
+[Unit]
+Description=Pi5 Fan Controller - Temperature-based fan speed controller for Raspberry Pi 5
+After=multi-user.target
+Wants=multi-user.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# Optional: load configuration from environment file
+# Create /etc/pi5-fan-controller/pi5-fan-controller.env with lines like:
+#   FAN_PATH=/sys/class/thermal/cooling_device0/cur_state
+#   HWMON0_NAME=cpu_thermal
+#   HWMON1_NAME=rp1_adc
+#   INTERVAL_SECONDS=15
+#   HYSTERESIS=2.0
+#   OFF_THRESHOLD=53.0
+#   LOW_THRESHOLD=54.0
+#   MEDIUM_THRESHOLD=59.0
+#   HIGH_THRESHOLD=64.0
+#   FULL_THRESHOLD=70.0
+#   DEBUG=false
+EnvironmentFile=-/etc/pi5-fan-controller/pi5-fan-controller.env
+
+# Run the executable
+ExecStart=/usr/local/bin/pi5_fan_controller
+
+# Journal integration
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pi5-fan-controller
+
+# Robustness
+Restart=always
+RestartSec=15s
+TimeoutStopSec=20s
+KillSignal=SIGTERM
+SendSIGKILL=no
+
+# Security (reasonable defaults for hardware access)
+# The service needs access to thermal sensors and fan control
+# ProtectSystem=full
+# ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target
+
