@@ -77,8 +77,15 @@ install(FILES systemd/pi5-fan-controller.service
     DESTINATION /etc/systemd/system
 )
 
-# Install config file
-install(FILES config/pi5-fan-controller.conf
-    DESTINATION /etc/pi5-fan-controller
-)
+# Install config file (only if it doesn't exist)
+install(CODE "
+    set(CONFIG_SOURCE \"\${CMAKE_SOURCE_DIR}/config/pi5-fan-controller.conf\")
+    set(CONFIG_DEST \"/etc/pi5-fan-controller/pi5-fan-controller.conf\")
+    if(NOT EXISTS \"\${CONFIG_DEST}\")
+        message(STATUS \"Installing config file to \${CONFIG_DEST}\")
+        file(INSTALL \"\${CONFIG_SOURCE}\" DESTINATION \"/etc/pi5-fan-controller\")
+    else()
+        message(STATUS \"Config file already exists at \${CONFIG_DEST}, skipping installation\")
+    endif()
+")
 

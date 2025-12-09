@@ -76,17 +76,21 @@ void FanController::run() {
         FanSpeed target_speed = determineTargetSpeed(temp_average);
 
         if (checkHysteresis(temp_average, target_speed)) {
-            if (target_speed != current_fan_speed_.load()) {
-                FanSpeed old_speed = current_fan_speed_.load();
-                if (setFanSpeed(target_speed)) {
+            FanSpeed current_speed = current_fan_speed_.load();
+            if (target_speed != current_speed) {
+                FanSpeed old_speed = current_speed;
+                setFanSpeed(target_speed);
+
+                // Always read back actual speed to verify and log the change
+                FanSpeed actual_speed = readFanSpeed();
+                if (actual_speed != old_speed) {
                     std::string msg = "T:" + formatTemperature(temp_average) + "°C S:" +
                                     fanSpeedToString(old_speed) + " -> " +
-                                    fanSpeedToString(target_speed);
+                                    fanSpeedToString(actual_speed);
                     logMessage(msg);
-                } else {
-                    // Re-sync fan speed from hardware
-                    current_fan_speed_ = readFanSpeed();
                 }
+                // Update current speed to match hardware, even if it didn't change
+                current_fan_speed_.store(actual_speed);
             }
         } else if (config_.debug) {
             std::string msg = "T:" + formatTemperature(temp_average) + "°C S:" +
@@ -258,25 +262,33 @@ bool FanController::setFanSpeed(FanSpeed speed) {
     }
 
     try {
-        std::ofstream fan_file(config_.fan_path);
-        if (!fan_file.is_open()) {
+        // Use file descriptor directly for reliable write and sync
+        int fd = open(config_.fan_path.c_str(), O_WRONLY);
+        if (fd < 0) {
             std::cerr << "Failed to open fan control file: " << config_.fan_path << std::endl;
             return false;
         }
 
-        fan_file << speed_value;
-        fan_file.flush();
-        fan_file.close();
-
-        // Use direct file descriptor for fsync
-        int fd = open(config_.fan_path.c_str(), O_WRONLY);
-        if (fd >= 0) {
-            fsync(fd);
+        // Write speed value as string
+        std::string speed_str = std::to_string(speed_value);
+        ssize_t written = write(fd, speed_str.c_str(), speed_str.length());
+        if (written < 0 || static_cast<size_t>(written) != speed_str.length()) {
+            std::cerr << "Failed to write fan speed value" << std::endl;
             close(fd);
+            return false;
         }
 
-        // Small delay for write to complete
-        usleep(100000); // 0.1 seconds
+        // Sync to ensure write is committed
+        if (fsync(fd) != 0) {
+            std::cerr << "Failed to sync fan speed write" << std::endl;
+            close(fd);
+            return false;
+        }
+
+        close(fd);
+
+        // Small delay for hardware to process the change
+        usleep(200000); // 0.2 seconds
 
         if (!verifyFanSpeedWrite(speed)) {
             return false;
